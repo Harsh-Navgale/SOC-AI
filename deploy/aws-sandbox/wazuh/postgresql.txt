@@ -1,0 +1,151 @@
+<group name="postgresql,database,">
+
+  <!-- Base -->
+  <rule id="100080" level="0">
+    <decoded_as>postgresql</decoded_as>
+    <description>PostgreSQL log.</description>
+  </rule>
+
+  <!-- ERROR / FATAL / PANIC -->
+  <rule id="100094" level="3">
+    <if_sid>100080</if_sid>
+    <field name="pg_level" type="pcre2">^(ERROR|FATAL|PANIC)$</field>
+    <description>PostgreSQL $(pg_level) for $(db_user) on $(database): $(pg_error)</description>
+  </rule>
+
+  <!-- Expected application errors: not correlated, no alert -->
+  <rule id="100098" level="0">
+    <if_sid>100094</if_sid>
+    <field name="pg_error" type="pcre2">(?i)^(duplicate key value violates unique constraint|could not serialize access|canceling statement due to (statement|lock) timeout|deadlock detected)</field>
+    <description>PostgreSQL: expected application error ($(pg_error)).</description>
+  </rule>
+
+  <!-- STATEMENT context line: no alert on its own -->
+  <!-- <rule id="100097" level="0">
+    <if_sid>100080</if_sid>
+    <field name="pg_level" type="pcre2">^STATEMENT$</field>
+    <description>PostgreSQL statement context line.</description>
+  </rule> -->
+
+  <!-- STATEMENT following a real ERROR from the same backend -->
+  <rule id="100095" level="5" timeframe="5">
+    <if_sid>100097</if_sid>
+    <if_matched_sid>100094</if_matched_sid>
+    <same_field>pg_pid</same_field>
+    <same_location />
+    <field name="db_action" type="pcre2">.+</field>
+    <description>PostgreSQL: failed $(db_action) on $(db_table)$(target_db) by $(db_user) from $(client).</description>
+  </rule>
+
+  <rule id="100096" level="9">
+    <if_sid>100095</if_sid>
+    <field name="db_action" type="pcre2">(?i)^(drop|truncate|alter)</field>
+    <description>PostgreSQL: failed destructive $(db_action) by $(db_user) from $(client).</description>
+    <mitre><id>T1485</id></mitre>
+  </rule>
+
+  <!-- Database DDL -->
+  <rule id="100081" level="4">
+    <if_sid>100080</if_sid>
+    <field name="pg_level" type="pcre2">^(LOG|STATEMENT)$</field>
+    <field name="db_action" type="pcre2">(?i)^create$</field>
+    <field name="target_db" type="pcre2">.+</field>
+    <description>PostgreSQL: database $(target_db) created by $(db_user) from $(client).</description>
+  </rule>
+
+  <rule id="100082" level="12">
+    <if_sid>100080</if_sid>
+    <field name="pg_level" type="pcre2">^(LOG|STATEMENT)$</field>
+    <field name="db_action" type="pcre2">(?i)^drop$</field>
+    <field name="target_db" type="pcre2">.+</field>
+    <description>PostgreSQL: database $(target_db) dropped by $(db_user) from $(client).</description>
+    <mitre><id>T1485</id></mitre>
+    <group>pci_dss_10.2.7,gdpr_IV_35.7.d,</group>
+  </rule>
+
+  <rule id="100093" level="6">
+    <if_sid>100080</if_sid>
+    <field name="pg_level" type="pcre2">^(LOG|STATEMENT)$</field>
+    <field name="db_action" type="pcre2">(?i)^alter$</field>
+    <field name="target_db" type="pcre2">.+</field>
+    <description>PostgreSQL: database $(target_db) altered by $(db_user) from $(client).</description>
+  </rule>
+
+  <!-- Table DDL -->
+  <rule id="100083" level="3">
+    <if_sid>100080</if_sid>
+    <field name="pg_level" type="pcre2">^(LOG|STATEMENT)$</field>
+    <field name="db_action" type="pcre2">(?i)^create$</field>
+    <field name="db_table" type="pcre2">.+</field>
+    <description>PostgreSQL: table $(db_table) created by $(db_user) in $(database).</description>
+  </rule>
+
+  <rule id="100084" level="10">
+    <if_sid>100080</if_sid>
+    <field name="pg_level" type="pcre2">^(LOG|STATEMENT)$</field>
+    <field name="db_action" type="pcre2">(?i)^drop$</field>
+    <field name="db_table" type="pcre2">.+</field>
+    <description>PostgreSQL: table $(db_table) dropped by $(db_user) in $(database) from $(client).</description>
+    <mitre><id>T1485</id></mitre>
+    <group>pci_dss_10.2.7,</group>
+  </rule>
+
+  <rule id="100091" level="5">
+    <if_sid>100080</if_sid>
+    <field name="pg_level" type="pcre2">^(LOG|STATEMENT)$</field>
+    <field name="db_action" type="pcre2">(?i)^alter$</field>
+    <field name="db_table" type="pcre2">.+</field>
+    <description>PostgreSQL: table $(db_table) altered by $(db_user) in $(database).</description>
+  </rule>
+
+  <rule id="100089" level="10">
+    <if_sid>100080</if_sid>
+    <field name="pg_level" type="pcre2">^(LOG|STATEMENT)$</field>
+    <field name="db_action" type="pcre2">(?i)^truncate</field>
+    <description>PostgreSQL: table $(db_table) truncated by $(db_user) in $(database) from $(client).</description>
+    <mitre><id>T1485</id></mitre>
+  </rule>
+
+  <!-- DML -->
+  <rule id="100085" level="2">
+    <if_sid>100080</if_sid>
+    <field name="pg_level" type="pcre2">^(LOG|STATEMENT)$</field>
+    <field name="db_action" type="pcre2">(?i)^insert$</field>
+    <description>PostgreSQL: insert into $(db_table) by $(db_user) ($(app)).</description>
+    <mitre><id>T1565.001</id></mitre>
+  </rule>
+
+  <rule id="100086" level="2">
+    <if_sid>100080</if_sid>
+    <field name="pg_level" type="pcre2">^(LOG|STATEMENT)$</field>
+    <field name="db_action" type="pcre2">(?i)^update$</field>
+    <description>PostgreSQL: update on $(db_table) by $(db_user) ($(app)).</description>
+    <mitre><id>T1565.001</id></mitre>
+  </rule>
+
+  <rule id="100087" level="4">
+    <if_sid>100080</if_sid>
+    <field name="pg_level" type="pcre2">^(LOG|STATEMENT)$</field>
+    <field name="db_action" type="pcre2">(?i)^delete</field>
+    <description>PostgreSQL: delete from $(db_table) by $(db_user) ($(app)).</description>
+    <mitre><id>T1565.001</id></mitre>
+  </rule>
+
+  <!-- UPDATE / DELETE without WHERE -->
+  <rule id="100088" level="10">
+    <if_sid>100086,100087</if_sid>
+    <match type="pcre2">(?i)(?:statement|execute\s+[^:]+):\s+(?:delete\s+from|update)\s+(?!.*\bwhere\b)[^;]+;?\s*$</match>
+    <description>PostgreSQL: $(db_action) on $(db_table) without WHERE clause by $(db_user) from $(client).</description>
+    <mitre><id>T1485</id><id>T1565.001</id></mitre>
+  </rule>
+
+  <!-- Burst of table drops by one user -->
+  <rule id="100092" level="13" frequency="5" timeframe="120">
+    <if_matched_sid>100084</if_matched_sid>
+    <same_field>db_user</same_field>
+    <description>PostgreSQL: multiple tables dropped by $(db_user) within 2 minutes.</description>
+    <mitre><id>T1485</id></mitre>
+  </rule>
+
+</group>
+

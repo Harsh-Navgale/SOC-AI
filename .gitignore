@@ -1,0 +1,27 @@
+.env
+certs/
+*.pem
+*.key
+*.crt
+
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+node_modules/
+dist/
+
+.DS_Store
+
+# Claude Code tool config/skills and the regeneratable code-graph cache — neither is needed
+# to build or run the app.
+.claude/
+graphify-out/
+
+# Scratch/sample artifacts that ended up tracked by accident.
+SOC-AI-Test-2.zip
+SOC-AI_gantt_chart.csv
+test.json
+test2.json
+google_ipranges.txt
